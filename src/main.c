@@ -1,6 +1,8 @@
 #define _POSIX_C_SOURCE 200809L
 
 
+#include <argon2.h>
+#include <time.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -38,15 +40,50 @@ typedef struct {
 } User;
 
 
+void generate_random_string(char *str, size_t length) {
+  const char charset[] = "abcedefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  if (length) {
+    for (size_t n = 0; n < length; n++) {
+      int key = rand() % (int)(sizeof(charset) - 1);
+      str[n] = charset[key];
+    }
+    str[length] = '\0';
+  }
+}
 
-User *createUser(char *name, char *password) {
+
+
+User *createUser(const char *name, const char *password) {
   User *newUser = calloc(1, sizeof(*newUser));
+
+  srand(time(NULL));
+  size_t length = 20;
+  char salt[length + 1];
+  generate_random_string(salt, length);
+
+  char hash[128];
+  char encoded[256];
+
+  long t_cost = 2;
+  long m_cost = 1 << 16;
+  long parallelism = 1;
+  long hashlen = 32;
+
+  int result = argon2_hash(t_cost, m_cost, parallelism, password, strlen(password), salt, strlen(salt), hash, hashlen, encoded, sizeof(encoded), Argon2_id, ARGON2_VERSION_13);
+
+  if (result == ARGON2_OK) {
+    printf("Encoded hash: %s\n", encoded);
+  } else {
+    fprintf(stderr, "error: %s\n", argon2_error_message(result));
+  }
+
   if (!newUser) {
     perror("failed to create new user");
     return NULL;
   }
   newUser->name = strdup(name);
-  newUser->passHash = strdup(password);
+  newUser->passHash = strdup(encoded);
+  newUser->salt = strdup(salt);
   newUser->incomes = NULL;
   newUser->expenses = NULL;
   newUser->budgets = NULL;
