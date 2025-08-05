@@ -15,7 +15,7 @@ typedef struct Income{
   struct Income *next;
 } Income;
 
-typedef struct {
+typedef struct Expense {
   char *name;
   long long money;
   struct Expense *next;
@@ -31,10 +31,12 @@ typedef struct Budget {
 typedef struct {
   char* name;
   char* passHash;
+  char *salt;
   Income *incomes;
   Expense *expenses;
   Budget *budgets;
 } User;
+
 
 
 User *createUser(char *name, char *password) {
@@ -91,6 +93,51 @@ long long totalIncome(User *user) {
 }
 
 
+void freeIncomeList(Income *head) {
+  while (head) {
+    Income *next = head->next;
+
+    free(head->name);
+    free(head);
+    head = next;
+  }
+}
+
+void freeExpenseList(Expense *head) {
+  while (head) {
+    Expense *next = head->next;
+
+    free(head->name);
+    free(head);
+    head = next;
+  }
+}
+
+void freeBudgetList(Budget *head) {
+  while (head) {
+    Budget *next = head->next;
+
+    free(head->name);
+    free(head);
+    head = next;
+  }
+}
+
+
+void freeUser(User *user) {
+  if (!user) return;
+
+  freeIncomeList(user->incomes);
+  freeExpenseList(user->expenses);
+  freeBudgetList(user->budgets);
+
+  free(user->name);
+  free(user->passHash);
+  free(user->salt);
+  free(user);
+}
+
+
 int main(void) {
   User *myUser = createUser("Test", "testPass");
   printf("%s\n", myUser->name);
@@ -102,5 +149,6 @@ int main(void) {
 
 
   printf("Finance App\n");
+  freeUser(myUser);
   return 0;
 }
