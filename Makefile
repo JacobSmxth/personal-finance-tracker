@@ -1,12 +1,12 @@
 CC=gcc
 CFLAGS=-Wall -Werror -Wextra -g
-MFLAGS=-largon2 -o
+LDFLAGS=-largon2 -lsodium
 
 SRC=src/main.c
 OUT=app
 
 all:
-	$(CC) $(SRC) $(MFLAGS) $(OUT) $(CFLAGS)
+	$(CC) $(CFLAGS) $(SRC) -o $(OUT) $(LDFLAGS)
 
 
 run:
@@ -14,6 +14,9 @@ run:
 
 edit:
 	nvim ./$(SRC)
+
+maker:
+	nvim ./Makefile
 
 clear:
 	rm -rf $(OUT)

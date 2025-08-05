@@ -1,8 +1,9 @@
+#include <sodium/utils.h>
 #define _POSIX_C_SOURCE 200809L
 
 
 #include <argon2.h>
-#include <time.h>
+#include <sodium.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -40,27 +41,22 @@ typedef struct {
 } User;
 
 
-void generate_random_string(char *str, size_t length) {
-  const char charset[] = "abcedefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  if (length) {
-    for (size_t n = 0; n < length; n++) {
-      int key = rand() % (int)(sizeof(charset) - 1);
-      str[n] = charset[key];
-    }
-    str[length] = '\0';
-  }
-}
-
-
 
 User *createUser(const char *name, const char *password) {
   User *newUser = calloc(1, sizeof(*newUser));
 
-  srand(time(NULL));
-  size_t length = 20;
-  char salt[length + 1];
-  generate_random_string(salt, length);
 
+
+
+  // Generate a salt to avoid Rainbow table attacks or whatever
+  uint8_t salt[crypto_pwhash_SALTBYTES];
+  randombytes_buf(salt, sizeof(salt));
+  char theSalt[(sizeof(salt) * 4/3) + 4];
+  sodium_bin2base64(theSalt, sizeof(theSalt), salt, sizeof(salt), sodium_base64_VARIANT_ORIGINAL);
+
+
+
+  // Set up some variables for the argon2 hash
   char hash[128];
   char encoded[256];
 
@@ -69,21 +65,25 @@ User *createUser(const char *name, const char *password) {
   long parallelism = 1;
   long hashlen = 32;
 
-  int result = argon2_hash(t_cost, m_cost, parallelism, password, strlen(password), salt, strlen(salt), hash, hashlen, encoded, sizeof(encoded), Argon2_id, ARGON2_VERSION_13);
+  int result = argon2_hash(t_cost, m_cost, parallelism, password, strlen(password), theSalt, strlen(theSalt), hash, hashlen, encoded, sizeof(encoded), Argon2_id, ARGON2_VERSION_13);
 
+
+  // Check for proper hash
   if (result == ARGON2_OK) {
     printf("Encoded hash: %s\n", encoded);
   } else {
     fprintf(stderr, "error: %s\n", argon2_error_message(result));
   }
 
+
   if (!newUser) {
     perror("failed to create new user");
     return NULL;
   }
+
   newUser->name = strdup(name);
   newUser->passHash = strdup(encoded);
-  newUser->salt = strdup(salt);
+  newUser->salt = strdup(theSalt);
   newUser->incomes = NULL;
   newUser->expenses = NULL;
   newUser->budgets = NULL;
@@ -181,7 +181,7 @@ int main(void) {
   addIncome(myUser, "Test", 19000);
   addIncome(myUser, "Test", 19000);
   addIncome(myUser, "Test", 11000);
-  printf("%lli\n", totalIncome(myUser));
+  printf("%lld\n", totalIncome(myUser));
 
 
 
