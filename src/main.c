@@ -53,10 +53,51 @@ User *createUser(char *name, char *password) {
 }
 
 
+void addIncome(User *user, char *incomeName, long long cents) {
+  Income *current = user->incomes;
+  Income *newIncome = calloc(1, sizeof(*newIncome));
+
+  newIncome->name = strdup(incomeName);
+  newIncome->money = cents;
+  newIncome->next = NULL;
+  if (current == NULL) {
+    user->incomes = newIncome;
+    return;
+  }
+
+  while (current->next != NULL) {
+    current = current->next;
+  }
+
+  current->next = newIncome;
+}
+
+
+long long totalIncome(User *user) {
+  Income *current = user->incomes;
+  long long total = 0;
+
+  if (current == NULL) {
+    return 0;
+  }
+
+  while(current->next != NULL) {
+    total += current->money;
+    current = current->next;
+  }
+  total += current->money;
+
+  return total;
+}
+
 
 int main(void) {
   User *myUser = createUser("Test", "testPass");
   printf("%s\n", myUser->name);
+  addIncome(myUser, "Test", 19000);
+  addIncome(myUser, "Test", 19000);
+  addIncome(myUser, "Test", 11000);
+  printf("%lli\n", totalIncome(myUser));
 
 
 
