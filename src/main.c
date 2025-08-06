@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 
 
@@ -160,21 +161,15 @@ void addBudget(User *user, char *budgetName, long long max) {
   current->next = newBudget;
 }
 
-long long totalIncome(User *user) {
-  Income *current = user->incomes;
-  long long total = 0;
 
-  if (current == NULL) {
-    return 0;
-  }
+void centsToString(char *str, long long cents) {
+  bool neg = cents < 0;
+  long long absCents = llabs(cents);
+  long long dollars = absCents / 100;
+  long long rem = absCents % 100;
 
-  while(current->next != NULL) {
-    total += current->money;
-    current = current->next;
-  }
-  total += current->money;
 
-  return total;
+  sprintf(str, "%s%lld.%.02lld", neg ? "-" : "", dollars, rem);
 }
 
 
@@ -196,8 +191,9 @@ void userOverview(User *user) {
     totalIncome += currentI->money;
 
 
-    totalIncome /= 100;
-    printf("You bring in an income of $%lld!\n", totalIncome);
+    char total[15];
+    centsToString(total, totalIncome);
+    printf("You bring in an income of $%s!\n", total);
   }
   if (!currentE) {
     printf("%s currently has no expenses\n", user->name);
@@ -207,17 +203,22 @@ void userOverview(User *user) {
       currentE = currentE->next;
     }
     totalExpense += currentE->money;
-    totalExpense /= 100;
-    printf("Your expenses total: $%lld\n", totalExpense);
+    char total[15];
+    centsToString(total, totalExpense);
+    printf("Your expenses total: $%s\n", total);
   }
   if (!currentB) {
     printf("%s currently has no budgets\n", user->name);
   }
 
   if (currentI && currentE) {
-    printf("Your Net Cash Flow: $%lld\n", totalIncome - totalExpense);
+    char total[15];
+    centsToString(total, totalIncome - totalExpense);
+
+
+    printf("Your Net Cash Flow: $%s\n", total);
     if (totalIncome <= totalExpense) {
-      printf("We need to bring in more money!");
+      printf("We need to bring in more money!\n");
     }
   }
 }
@@ -271,10 +272,10 @@ void freeUser(User *user) {
 int main(void) {
   User *myUser = createUser("Jacob Smith", "testPass");
   printf("%s\n", myUser->name);
-  addIncome(myUser, "Test", 19000);
-  addIncome(myUser, "Test", 19000);
-  addIncome(myUser, "Test", 11000);
-  addExpense(myUser, "Another Test", 10000);
+  addIncome(myUser, "Test", 50671);
+  addIncome(myUser, "Test", 37500);
+  addIncome(myUser, "Test", 40162);
+  addExpense(myUser, "Another Test", 800291);
 
   userOverview(myUser);
 
