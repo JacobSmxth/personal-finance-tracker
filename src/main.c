@@ -1,8 +1,7 @@
-#include <sodium/utils.h>
 #define _POSIX_C_SOURCE 200809L
 
-
 #include <argon2.h>
+#include <sodium/utils.h>
 #include <sodium.h>
 #include <stdio.h>
 #include <string.h>
@@ -44,8 +43,10 @@ typedef struct {
 
 User *createUser(const char *name, const char *password) {
   User *newUser = calloc(1, sizeof(*newUser));
-
-
+  if (!newUser) {
+    perror("failed to create new user");
+    return NULL;
+  }
 
 
   // Generate a salt to avoid Rainbow table attacks or whatever
@@ -76,11 +77,6 @@ User *createUser(const char *name, const char *password) {
   }
 
 
-  if (!newUser) {
-    perror("failed to create new user");
-    return NULL;
-  }
-
   newUser->name = strdup(name);
   newUser->passHash = strdup(encoded);
   newUser->salt = strdup(theSalt);
@@ -95,6 +91,10 @@ User *createUser(const char *name, const char *password) {
 void addIncome(User *user, char *incomeName, long long cents) {
   Income *current = user->incomes;
   Income *newIncome = calloc(1, sizeof(*newIncome));
+  if (!newIncome) {
+    perror("Error: failed to add new income source");
+    return;
+  }
 
   newIncome->name = strdup(incomeName);
   newIncome->money = cents;
@@ -111,6 +111,54 @@ void addIncome(User *user, char *incomeName, long long cents) {
   current->next = newIncome;
 }
 
+void addExpense(User *user, char *expenseName, long long cents) {
+  Expense *current = user->expenses;
+  Expense *newExpense = calloc(1, sizeof(*newExpense));
+
+  if (!newExpense) {
+    perror("Error: failed to create new expense");
+    return;
+  }
+
+  newExpense->name = strdup(expenseName);
+  newExpense->money = cents;
+  newExpense->next = NULL;
+  if (current == NULL) {
+    user->expenses = newExpense;
+    return;
+  }
+
+  while (current->next != NULL) {
+    current = current->next;
+  }
+
+  current->next = newExpense;
+}
+
+void addBudget(User *user, char *budgetName, long long max) {
+  Budget *current = user->budgets;
+  Budget *newBudget = calloc(1, sizeof(*newBudget));
+
+  if (!newBudget) {
+    perror("Error: failed to create new budget");
+    return;
+  }
+
+  newBudget->name = strdup(budgetName);
+  newBudget->current = 0;
+  newBudget->max = max;
+  newBudget->next = NULL;
+  if (current == NULL) {
+    user->budgets = newBudget;
+    return;
+  }
+
+  while (current->next != NULL) {
+    current = current->next;
+  }
+
+  current->next = newBudget;
+}
 
 long long totalIncome(User *user) {
   Income *current = user->incomes;
@@ -127,6 +175,51 @@ long long totalIncome(User *user) {
   total += current->money;
 
   return total;
+}
+
+
+void userOverview(User *user) {
+  Income *currentI = user->incomes;
+  Expense *currentE = user->expenses;
+  Budget *currentB = user->budgets;
+
+  long long totalIncome = 0;
+  long long totalExpense = 0;
+
+  if (!currentI) {
+    printf("%s currently has no incomes\n", user->name);
+  } else {
+    while(currentI->next != NULL) {
+      totalIncome += currentI->money;
+      currentI = currentI->next;
+    }
+    totalIncome += currentI->money;
+
+
+    totalIncome /= 100;
+    printf("You bring in an income of $%lld!\n", totalIncome);
+  }
+  if (!currentE) {
+    printf("%s currently has no expenses\n", user->name);
+  } else {
+    while(currentE->next != NULL) {
+      totalExpense += currentE->money;
+      currentE = currentE->next;
+    }
+    totalExpense += currentE->money;
+    totalExpense /= 100;
+    printf("Your expenses total: $%lld\n", totalExpense);
+  }
+  if (!currentB) {
+    printf("%s currently has no budgets\n", user->name);
+  }
+
+  if (currentI && currentE) {
+    printf("Your Net Cash Flow: $%lld\n", totalIncome - totalExpense);
+    if (totalIncome <= totalExpense) {
+      printf("We need to bring in more money!");
+    }
+  }
 }
 
 
@@ -176,13 +269,14 @@ void freeUser(User *user) {
 
 
 int main(void) {
-  User *myUser = createUser("Test", "testPass");
+  User *myUser = createUser("Jacob Smith", "testPass");
   printf("%s\n", myUser->name);
   addIncome(myUser, "Test", 19000);
   addIncome(myUser, "Test", 19000);
   addIncome(myUser, "Test", 11000);
-  printf("%lld\n", totalIncome(myUser));
+  addExpense(myUser, "Another Test", 10000);
 
+  userOverview(myUser);
 
 
   printf("Finance App\n");
