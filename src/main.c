@@ -13,18 +13,21 @@
 // Storing money as cents
 
 typedef struct Income{
+  int id;
   char *name;
   long long money;
   struct Income *next;
 } Income;
 
 typedef struct Expense {
+  int id;
   char *name;
   long long money;
   struct Expense *next;
 } Expense;
 
 typedef struct Budget {
+  int id;
   char *name;
   long long current;
   long long max;
@@ -32,6 +35,7 @@ typedef struct Budget {
 } Budget;
 
 typedef struct {
+  int id;
   char* name;
   char* passHash;
   char *salt;
@@ -67,13 +71,13 @@ User *createUser(const char *name, const char *password) {
   long parallelism = 1;
   long hashlen = 32;
 
+
+  // Don't fully understand this. Added from an example online.
   int result = argon2_hash(t_cost, m_cost, parallelism, password, strlen(password), theSalt, strlen(theSalt), hash, hashlen, encoded, sizeof(encoded), Argon2_id, ARGON2_VERSION_13);
 
 
   // Check for proper hash
-  if (result == ARGON2_OK) {
-    printf("Encoded hash: %s\n", encoded);
-  } else {
+  if (result != ARGON2_OK) {
     fprintf(stderr, "error: %s\n", argon2_error_message(result));
   }
 
@@ -89,18 +93,19 @@ User *createUser(const char *name, const char *password) {
 }
 
 
-void addIncome(User *user, char *incomeName, long long cents) {
+void createIncome(User *user, char *incomeName, long long cents) {
   Income *current = user->incomes;
   Income *newIncome = calloc(1, sizeof(*newIncome));
   if (!newIncome) {
     perror("Error: failed to add new income source");
     return;
   }
-
+  int count = 0;
   newIncome->name = strdup(incomeName);
   newIncome->money = cents;
   newIncome->next = NULL;
   if (current == NULL) {
+    newIncome->id = count;
     user->incomes = newIncome;
     return;
   }
@@ -112,7 +117,7 @@ void addIncome(User *user, char *incomeName, long long cents) {
   current->next = newIncome;
 }
 
-void addExpense(User *user, char *expenseName, long long cents) {
+void createExpense(User *user, char *expenseName, long long cents) {
   Expense *current = user->expenses;
   Expense *newExpense = calloc(1, sizeof(*newExpense));
 
@@ -136,7 +141,7 @@ void addExpense(User *user, char *expenseName, long long cents) {
   current->next = newExpense;
 }
 
-void addBudget(User *user, char *budgetName, long long max) {
+void createBudget(User *user, char *budgetName, long long max) {
   Budget *current = user->budgets;
   Budget *newBudget = calloc(1, sizeof(*newBudget));
 
@@ -145,20 +150,52 @@ void addBudget(User *user, char *budgetName, long long max) {
     return;
   }
 
+  int count = 0;
   newBudget->name = strdup(budgetName);
   newBudget->current = 0;
   newBudget->max = max;
   newBudget->next = NULL;
   if (current == NULL) {
+    newBudget->id = count;
     user->budgets = newBudget;
     return;
   }
 
+  count = 1;
   while (current->next != NULL) {
+    count++;
     current = current->next;
   }
 
+  newBudget->id = count;
   current->next = newBudget;
+}
+
+
+void addToBudget(User *user, int id, long long amount) {
+  Budget *current = user->budgets;
+  while (current->id != id) {
+    if (current->next != NULL) {
+      current = current->next;
+    } else {
+      perror("You fucking loser: that's not a valid ID...\n");
+      return;
+    }
+  }
+  current->current += amount;
+}
+
+void resetBudget(User *user, int id) {
+  Budget *current = user->budgets;
+  while(current->id != id) {
+    if (current->next != NULL) {
+      current = current->next;
+    } else {
+      perror("Error: Invalid ID...");
+      return;
+    }
+  }
+  current->current = 0;
 }
 
 
@@ -209,6 +246,15 @@ void userOverview(User *user) {
   }
   if (!currentB) {
     printf("%s currently has no budgets\n", user->name);
+  } else {
+    while(currentB != NULL) {
+      char bottom[15];
+      char top[15];
+      centsToString(bottom, currentB->current);
+      centsToString(top, currentB->max);
+      printf("%d. %s: %s/%s\n", currentB->id, currentB->name,bottom, top);
+      currentB = currentB->next;
+    }
   }
 
   if (currentI && currentE) {
@@ -270,17 +316,21 @@ void freeUser(User *user) {
 
 
 int main(void) {
+  if (sodium_init() < 0) {
+    fputs("libsodium init failed\n", stderr);
+    return 1;
+  }
+
   User *myUser = createUser("Jacob Smith", "testPass");
-  printf("%s\n", myUser->name);
-  addIncome(myUser, "Test", 50671);
-  addIncome(myUser, "Test", 37500);
-  addIncome(myUser, "Test", 40162);
-  addExpense(myUser, "Another Test", 800291);
+  createBudget(myUser, "Grocery", 80000);
+  addToBudget(myUser, 0, 75121);
+  userOverview(myUser);
+
+  resetBudget(myUser, 0);
 
   userOverview(myUser);
 
 
-  printf("Finance App\n");
   freeUser(myUser);
   return 0;
 }
