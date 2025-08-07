@@ -100,6 +100,15 @@ User *createUser(const char *name, const char *password) {
   char theSalt[(sizeof(salt) * 4/3) + 4];
   sodium_bin2base64(theSalt, sizeof(theSalt), salt, sizeof(salt), sodium_base64_VARIANT_ORIGINAL);
 
+
+  size_t pwlen = strlen(password);
+  char *pwbuf = malloc(pwlen + 1);
+  if (!pwbuf) {
+    perror("malloc failed");
+    return NULL;
+  }
+  memcpy(pwbuf, password, pwlen + 1);
+
   // Set up some variables for the argon2 hash
   char hash[128];
   char encoded[256];
@@ -110,16 +119,23 @@ User *createUser(const char *name, const char *password) {
   long hashlen = 32;
 
   // Don't fully understand this. Added from an example online.
-  int result = argon2_hash(t_cost, m_cost, parallelism, password, strlen(password), theSalt, strlen(theSalt), hash, hashlen, encoded, sizeof(encoded), Argon2_id, ARGON2_VERSION_13);
+  int result = argon2_hash(t_cost, m_cost, parallelism, pwbuf, pwlen, salt, sizeof(salt), hash, hashlen, encoded, sizeof(encoded), Argon2_id, ARGON2_VERSION_13);
 
   // Check for proper hash
   if (result != ARGON2_OK) {
     fprintf(stderr, "error: %s\n", argon2_error_message(result));
+    return NULL;
   }
+  sodium_memzero(pwbuf, pwlen);
+  free(pwbuf);
 
   newUser->name = strdup(name);
   newUser->passHash = strdup(encoded);
   newUser->salt = strdup(theSalt);
+
+  sodium_memzero(hash, sizeof(hash));
+  sodium_memzero(encoded, sizeof(encoded));
+
   newUser->incomes = NULL;
   newUser->expenses = NULL;
   newUser->budgets = NULL;
