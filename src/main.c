@@ -11,7 +11,6 @@
 
 
 // Storing money as cents
-
 typedef struct Income{
   int id;
   char *name;
@@ -35,7 +34,6 @@ typedef struct Budget {
 } Budget;
 
 typedef struct {
-  int id;
   char* name;
   char* passHash;
   char *salt;
@@ -45,6 +43,49 @@ typedef struct {
 } User;
 
 
+// Create User & info
+User *createUser(const char *name, const char *password);
+void createIncome(User *user, char *incomeName, long long cents);
+void createExpense(User *user, char *expenseName, long long cents);
+void createBudget(User *user, char *budgetName, long long max);
+
+// Adjust User info
+void addToBudget(User *user, int id, long long amount);
+void resetBudget(User *user, int id);
+
+// Utility functions
+void centsToString(char *str, long long cents);
+
+// Test Functions
+void userOverview(User *user);
+
+// Teardown functions functions
+void freeIncomeList(Income *head);
+void freeExpenseList(Expense *head);
+void freeBudgetList(Budget *head);
+void freeUser(User *user);
+
+// Main Function
+int main(void) {
+  // Check for any failures in the salt library initializing
+  if (sodium_init() < 0) {
+    fputs("libsodium init failed\n", stderr);
+    return 1;
+  }
+
+  User *myUser = createUser("Jacob Smith", "testPass");
+  createBudget(myUser, "Grocery", 80000);
+  addToBudget(myUser, 0, 75121);
+  userOverview(myUser);
+
+  resetBudget(myUser, 0);
+
+  userOverview(myUser);
+
+  freeUser(myUser);
+  return 0;
+}
+
 
 User *createUser(const char *name, const char *password) {
   User *newUser = calloc(1, sizeof(*newUser));
@@ -53,14 +94,11 @@ User *createUser(const char *name, const char *password) {
     return NULL;
   }
 
-
   // Generate a salt to avoid Rainbow table attacks or whatever
   uint8_t salt[crypto_pwhash_SALTBYTES];
   randombytes_buf(salt, sizeof(salt));
   char theSalt[(sizeof(salt) * 4/3) + 4];
   sodium_bin2base64(theSalt, sizeof(theSalt), salt, sizeof(salt), sodium_base64_VARIANT_ORIGINAL);
-
-
 
   // Set up some variables for the argon2 hash
   char hash[128];
@@ -71,16 +109,13 @@ User *createUser(const char *name, const char *password) {
   long parallelism = 1;
   long hashlen = 32;
 
-
   // Don't fully understand this. Added from an example online.
   int result = argon2_hash(t_cost, m_cost, parallelism, password, strlen(password), theSalt, strlen(theSalt), hash, hashlen, encoded, sizeof(encoded), Argon2_id, ARGON2_VERSION_13);
-
 
   // Check for proper hash
   if (result != ARGON2_OK) {
     fprintf(stderr, "error: %s\n", argon2_error_message(result));
   }
-
 
   newUser->name = strdup(name);
   newUser->passHash = strdup(encoded);
@@ -111,9 +146,11 @@ void createIncome(User *user, char *incomeName, long long cents) {
   }
 
   while (current->next != NULL) {
+    count++;
     current = current->next;
   }
 
+  newIncome->id = count;
   current->next = newIncome;
 }
 
@@ -126,18 +163,23 @@ void createExpense(User *user, char *expenseName, long long cents) {
     return;
   }
 
+  int count = 0;
   newExpense->name = strdup(expenseName);
   newExpense->money = cents;
   newExpense->next = NULL;
   if (current == NULL) {
+    newExpense->id = count;
     user->expenses = newExpense;
     return;
   }
 
+  count = 1;
   while (current->next != NULL) {
+    count++;
     current = current->next;
   }
 
+  newExpense->id = count;
   current->next = newExpense;
 }
 
@@ -178,7 +220,7 @@ void addToBudget(User *user, int id, long long amount) {
     if (current->next != NULL) {
       current = current->next;
     } else {
-      perror("You fucking loser: that's not a valid ID...\n");
+      perror("Error: that's not a valid ID...\n");
       return;
     }
   }
@@ -314,23 +356,3 @@ void freeUser(User *user) {
   free(user);
 }
 
-
-int main(void) {
-  if (sodium_init() < 0) {
-    fputs("libsodium init failed\n", stderr);
-    return 1;
-  }
-
-  User *myUser = createUser("Jacob Smith", "testPass");
-  createBudget(myUser, "Grocery", 80000);
-  addToBudget(myUser, 0, 75121);
-  userOverview(myUser);
-
-  resetBudget(myUser, 0);
-
-  userOverview(myUser);
-
-
-  freeUser(myUser);
-  return 0;
-}
